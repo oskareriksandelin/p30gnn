@@ -55,7 +55,6 @@ def build_edges_from_neighbors(nbr_data, edge_features):
     edge_index_np -= 1  # zero-based indexing
 
     # currently hardcoded features
-    # TODO: make this flexible if needed
     edge_attr_np = nbr_data[edge_features].to_numpy(dtype=np.float32)
 
     # Zero-copy conversion to torch
