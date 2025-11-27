@@ -39,17 +39,18 @@ def build_edges_from_neighbors(nbr_data):
         edge_attr (torch.FloatTensor): Tensor of shape [num_edges, num_edge_features]
     """
 
-    edge_index = torch.tensor([
-        nbr_data['iatom'].values - 1, # subtract 1 for zero-based indexing
-        nbr_data['jatom'].values - 1  #
-    ], dtype=torch.long)
-    
+    edge_index_np = nbr_data[['iatom', 'jatom']].to_numpy().T
+    edge_index_np = edge_index_np.astype(np.int64)
+    edge_index_np -= 1  # zero-based indexing
+
     # currently hardcoded features
     # TODO: make this flexible if needed
-    edge_attr = torch.tensor(
-        nbr_data[['dx', 'dy', 'dz', 'Jij', 'rij']].values,
-        dtype=torch.float
-    )
+    edge_attr_np = nbr_data[['dx', 'dy', 'dz', 'Jij', 'rij']].to_numpy(dtype=np.float32)
+
+    # Zero-copy conversion to torch
+    edge_index = torch.from_numpy(edge_index_np)
+    edge_attr = torch.from_numpy(edge_attr_np)
+
     return edge_index, edge_attr
 
 
@@ -60,6 +61,8 @@ def extract_static_tensor(static_feats, n_atoms):
         static_feats (dict): {atom_id: {feature_key: feature_value_array}}
         n_atoms (int): Number of atoms in the system
     """
+
+    # TODO: make feature keys flexible if needed
     feature_keys = ['valence', 'lmax'] # ex for now
     rows = []
     for i in range(1, n_atoms + 1):
@@ -203,7 +206,7 @@ if __name__ == "__main__":
     from time import time
     start = time()
     dataset = FeGdMagneticDataset(
-        root='FeGd',
+        root=r'../FeGd',
         systems=[2, 3],
         cutoff_dist=0.3,  # example cutoff distance
         use_static_features=False, # probaly not needed for now  
@@ -212,7 +215,9 @@ if __name__ == "__main__":
     
     print(f"Dataset size: {len(dataset)}")
     print(f"\nFirst graph:")
+    time_start = time()
     data = dataset[0]
+    print(f"Graph loaded in {time() - time_start:.2f} seconds")
     print("Graph info for first data point:")
     print(f"Nodes: {data.num_nodes}")
     print(f"Edges: {data.num_edges}")
