@@ -174,7 +174,6 @@ class FeGdMagneticDataset(Dataset):
         y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float)
 
         x_parts = [
-            pos,
             node_type,
             moment
         ]
