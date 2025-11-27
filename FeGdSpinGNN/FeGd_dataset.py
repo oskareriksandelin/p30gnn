@@ -2,6 +2,7 @@ import os
 import re
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import torch
 from torch_geometric.data import Data, Dataset
 
@@ -102,7 +103,7 @@ class FeGdMagneticDataset(Dataset):
         self._load_all_systems()
 
     def _load_all_systems(self):
-        for sys in self.systems:
+        for sys in tqdm(self.systems, desc="Loading systems"):
             path = os.path.join(self.root, f'FeGd_data_POSCAR_{sys}')
 
             pos = pd.read_csv(f'{path}/coord.FeGd_100.out', sep=r'\s+', header=None,
