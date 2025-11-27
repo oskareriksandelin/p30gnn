@@ -7,7 +7,6 @@ import torch
 from torch_geometric.data import Data, Dataset
 
 
-
 def parse_nml(path):
     """
     Parse a .nml file to extract features as a dictionary.
@@ -27,17 +26,29 @@ def parse_nml(path):
     return feats
 
 
-def build_edges_from_neighbors(nbr_data):
+def build_edges_from_neighbors(nbr_data, edge_features):
     """
     Build edge_index and edge_attr tensors from neighbor DataFrame.
 
     Args:
         nbr_data (pd.DataFrame): DataFrame with neighbor info, must contain columns:
-            'iatom', 'jatom', 'dx', 'dy', 'dz', 'Jij', 'rij'
+            'iatom', 'jatom', 'dx', 'dy', 'dz', 'rij'
+        features (list): List of feature column names to include in edge_attr
+            'dx', 'dy', 'dz': relative position components
+            'rij': distance between atoms
     Returns:
         edge_index (torch.LongTensor): Tensor of shape [2, num_edges]
         edge_attr (torch.FloatTensor): Tensor of shape [num_edges, num_edge_features]
     """
+
+    valid_features = nbr_data.drop('Jij', axis=1).columns   #defines valid features excluding 'Jij'
+
+    if isinstance(edge_features, str) and edge_features.lower() == 'all':
+        edge_features = ['dx', 'dy', 'dz', 'rij']
+    elif any(feat not in valid_features for feat in edge_features):
+        raise ValueError("One or more specified edge features are not present in the neighbor data columns.")
+    elif edge_features is None or not isinstance(edge_features, list):
+        raise ValueError("edge_features must be 'all' or a list containing the correct feature names (see docstring)")
 
     edge_index_np = nbr_data[['iatom', 'jatom']].to_numpy().T
     edge_index_np = edge_index_np.astype(np.int64)
@@ -45,7 +56,7 @@ def build_edges_from_neighbors(nbr_data):
 
     # currently hardcoded features
     # TODO: make this flexible if needed
-    edge_attr_np = nbr_data[['dx', 'dy', 'dz', 'Jij', 'rij']].to_numpy(dtype=np.float32)
+    edge_attr_np = nbr_data[edge_features].to_numpy(dtype=np.float32)
 
     # Zero-copy conversion to torch
     edge_index = torch.from_numpy(edge_index_np)
@@ -92,13 +103,17 @@ class FeGdMagneticDataset(Dataset):
         systems (list): List of system numbers to include (e.g., [2, 3, 4])
         cutoff_dist (float): cutoff distance for edge construction (None to use all neighbors in struct file)
         use_static_features (bool): Whether to include .nml static features
+        edge_features (str or list): 'all' to use all available edge features, or list of specific features to include e.g ['dx', 'dy', 'rij']
+                \n 'dx', 'dy', 'dz': relative position components
+                \n 'rij': distance between atoms
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
+        self.edge_features = edge_features
         
         self.cache = {}
         self.index_map = []
@@ -188,7 +203,7 @@ class FeGdMagneticDataset(Dataset):
         if self.cutoff_dist: # apply cutoff
             nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
             
-        edge_index, edge_attr = build_edges_from_neighbors(nbr_df)
+        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
 
         return Data(
             x=x,
@@ -201,14 +216,14 @@ class FeGdMagneticDataset(Dataset):
         )
     
 
-
 if __name__ == "__main__":
     from time import time
     start = time()
     dataset = FeGdMagneticDataset(
-        root=r'../FeGd',
-        systems=[2, 3],
+        root=r'data',
+        systems=[2],
         cutoff_dist=0.3,  # example cutoff distance
+        edge_features='ALL',  # example edge features
         use_static_features=False, # probaly not needed for now  
     )
     print(f"Dataset loaded in {time() - start:.2f} seconds")
@@ -222,7 +237,7 @@ if __name__ == "__main__":
     print(f"Nodes: {data.num_nodes}")
     print(f"Edges: {data.num_edges}")
     print(f"Node features shape: {data.x.shape}")
-    print(f"Edge features shape: {data.edge_attr.shape}")
+    print(f"Edge features shape: {data.edge_attr.shape}, ")
     print(f"Target shape: {data.y.shape}")
     print(f"System ID: {data.system_id}")
     print(f"Timestep: {data.timestep}")
