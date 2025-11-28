@@ -33,7 +33,7 @@ def build_edges_from_neighbors(nbr_data, edge_features):
     Args:
         nbr_data (pd.DataFrame): DataFrame with neighbor info, must contain columns:
             'iatom', 'jatom', 'dx', 'dy', 'dz', 'rij'
-        features (list): List of feature column names to include in edge_attr
+        edge_features (list or str): List of edge feature names to include, or 'all' to include all available features.
             'dx', 'dy', 'dz': relative position components
             'rij': distance between atoms
     Returns:
@@ -54,7 +54,7 @@ def build_edges_from_neighbors(nbr_data, edge_features):
     edge_index_np = edge_index_np.astype(np.int64)
     edge_index_np -= 1  # zero-based indexing
 
-    # currently hardcoded features
+    # Extract edge attributes
     edge_attr_np = nbr_data[edge_features].to_numpy(dtype=np.float32)
 
     # Zero-copy conversion to torch
