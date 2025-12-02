@@ -71,7 +71,7 @@ def basis_transformation(coord, l_max=2):
     Edge attributes of the angular momentum will be direction, magnitude and spherical harmonics.
     
     Args:
-        data: Tensor of shape [num_datapoint, num_features]
+        data: Matrix of coordinates [xs, ys, zs] (num_data, 3)
         l_max: Int of highest order of harmonics
     Returns:
         Tensor of transformed coordinates in spherical harmonics basis.
