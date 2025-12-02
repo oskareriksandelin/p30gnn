@@ -131,7 +131,7 @@ class FeGdMagneticDataset(Dataset):
 
             m = pd.read_csv(f'{path}/moment.FeGd_100.out', sep=r'\s+', engine='python',
                             header=None, comment='#',
-                            names=['iter','ens','Site','|Mom|','M_x','M_y','M_z'])
+                            names=['Iter','ens','Site','|Mom|','M_x','M_y','M_z'])
 
             nbr = pd.read_csv(f'{path}/struct.FeGd_100.out', sep=r'\s+', comment='#',
                           names=['iatom','jatom','itype','jtype','dx','dy','dz','Jij','rij'])
@@ -144,8 +144,8 @@ class FeGdMagneticDataset(Dataset):
             self.cache[sys] = dict(pos=pos, B=B, m=m, nbr=nbr, static=static)
             
             # build index map for (system, timestep)
-            n_steps = B['Iter'].nunique() # unique timesteps
-            for t in range(n_steps):
+            iter_vals = sorted(B['Iter'].unique())  # use real Iter values from the file
+            for t in iter_vals:
                 self.index_map.append((sys, t))
 
     def _load_static_features(self, system):
@@ -181,7 +181,7 @@ class FeGdMagneticDataset(Dataset):
             node_type[start+24:start+100] = fe
 
         # timestep filtering (sort to ensure correct order)
-        m_t = m_df[m_df['iter'] == t].sort_values('Site')
+        m_t = m_df[m_df['Iter'] == t].sort_values('Site')
         B_t = B_df[B_df['Iter'] == t].sort_values('Site')
 
         moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float)
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     print(f"Dataset size: {len(dataset)}")
     print(f"\nFirst graph:")
     time_start = time()
-    data = dataset[0]
+    data = dataset[1]
     print(f"Graph loaded in {time() - time_start:.2f} seconds")
     print("Graph info for first data point:")
     print(f"Nodes: {data.num_nodes}")
