@@ -57,6 +57,12 @@ def build_edges_from_neighbors(nbr_data, edge_features):
     # Extract edge attributes
     edge_attr_np = nbr_data[edge_features].to_numpy(dtype=np.float32)
 
+    # convert edge vectors to unit vectors if dx, dy, dz are included
+    if edge_features == ['dx', 'dy', 'dz', 'rij']:
+        vecs = edge_attr_np[:, :3]
+        unit_vecs = vecs / edge_attr_np[:, 3:4]  # divide by rij to get unit vector
+        edge_attr_np[:, :3] = unit_vecs
+
     # Zero-copy conversion to torch
     edge_index = torch.from_numpy(edge_index_np)
     edge_attr = torch.from_numpy(edge_attr_np)
@@ -218,7 +224,7 @@ if __name__ == "__main__":
     from time import time
     start = time()
     dataset = FeGdMagneticDataset(
-        root=r'data',
+        root=r'FeGd',
         systems=[2],
         cutoff_dist=0.3,  # example cutoff distance
         edge_features='ALL',  # example edge features
