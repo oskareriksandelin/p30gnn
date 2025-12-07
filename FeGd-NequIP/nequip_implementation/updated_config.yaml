@@ -1,0 +1,60 @@
+# ===========
+#     RUN
+# ===========
+# the run types will be completed in sequence
+# one can do `train`, `val`, `test` run types
+run: [train, test]
+
+# data and model r_max can be different (model's r_max should be smaller), but we try to make them the same
+cutoff_radius: 5.0
+
+# variable interpolation is convenient for wandb sweeps, see documentation for more details
+# the following are NequIP model hyperparameters that can be swept over
+num_layers: 4       # number of interaction blocks, we find 3-5 to work best
+l_max: 1            # the maximum irrep order (rotation order) for the network's features, l=1 is a good default, l=2 is more accurate but slower
+num_features: 32    # the multiplicity of the features, 32 is a good default for accurate network, if you want to be more accurate, go larger, if you want to be faster, go lower
+
+# There are two sets of atomic types to keep track of in most applications.
+# There is the conventional atomic species (e.g. C, H), and a separate `type_names` known to the model.
+# The model only knows types based on a set of zero-based indices and user-given `type_names` argument.
+# An example where this distinction is necessary include datasets with the same atomic species with different charge states:
+# we could define `chemical_species: [C, C]` and model `type_names: [C3, C4]` for +3 and +4 charge states.
+# There could also be instances such as coarse graining we only care about the model's `type_names` (no need to define chemical species).
+# Because of this distinction, these variables show up as arguments across different categories, including, data, model, metrics and even callbacks.
+# In this case, we fix both to be the same, so we define a single set of each here and use variable interpolation to retrieve them below.
+# This ensures a single location where the values are set to reduce the chances of misconfiguring runs.
+model_type_names: [Fe, Gd]
+chemical_species: ${model_type_names}
+
+# We want a metric to condition training on (e.g. for best `ModelCheckpoint`, `EarlyStopping`, LR scheduling) which will show up in various places later on, so we set up a "single source of truth" to interpolate over
+# see https://nequip.readthedocs.io/en/latest/guide/configuration/metrics.html
+monitored_metric: val0_epoch/weighted_sum
+
+# ============
+#     DATA
+# ============
+# New users are advised to read the "Data Configuration" docs before continuing: https://nequip.readthedocs.io/en/latest/guide/configuration/data.html
+data:
+  _target_: nequip.data.datamodule.ASEDataModule
+  seed: 456             # dataset seed for reproducibility
+
+  # here we take an ASE-readable file (in extxyz format) and split it into train:val:test = 80:10:10
+  split_dataset:
+    file_path: fegd_dataset.xyz
+    train: 0.8
+    val: 0.1
+    test: 0.1
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_epochs: 50
+  # ... trainer settings
+
+training_module:
+  _target_: nequip.train.NequIPLightningModule
+  model:
+    # model architecture config
+  loss:
+    # loss configuration
+  val_metrics:
+    # validation metrics

@@ -1,0 +1,125 @@
+# NequIP Configuration for FEGD Dataset
+# =====================================
+
+# Run configuration
+run: [train, test]
+
+# Cutoff radius
+cutoff_radius: 5.0
+
+# Model hyperparameters (minimal for 4GB GPU)
+num_layers: 2
+l_max: 1
+num_features: 16
+
+# Chemical species and types
+model_type_names: [Gd, Fe]
+
+
+# ============
+#     DATA
+# ============
+data:
+  _target_: nequip.data.datamodule.ASEDataModule
+  seed: 42
+
+  # Split your XYZ file into train/val/test
+  split_dataset:
+    file_path: /home/dadda/python/deep_learning/nequip/custom_files/fegd_dataset.xyz
+    train: 0.8
+    val: 0.1
+    test: 0.1
+
+  # Data transforms: convert raw ASE data to NequIP format
+  transforms:
+    # Map chemical species to model atom types
+    - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+      type_names: ${model_type_names}
+    
+    # Build neighbor list for the model (required for NequIP)
+    - _target_: nequip.data.transforms.NeighborListTransform
+      r_max: ${cutoff_radius}
+
+  # DataLoader configuration (reduced batch size for memory)
+  batch_size: 2
+  num_workers: 0
+
+
+# =============
+#    TRAINER
+# =============
+trainer:
+  _target_: lightning.Trainer
+  accelerator: auto
+  devices: auto
+  max_epochs: 5
+  log_every_n_steps: 10
+  default_root_dir: ./results
+
+
+# =====================
+#    TRAINING MODULE
+# =====================
+training_module:
+  _target_: nequip.train.NequIPLightningModule
+  ema_decay: 0.999
+
+  # Loss function
+  loss:
+    _target_: nequip.train.EnergyForceLoss
+    per_atom_energy: true
+    coeffs:
+      total_energy: 1.0
+      forces: 0.0  # No forces in your data
+
+  # Validation metrics
+  val_metrics:
+    _target_: nequip.train.EnergyForceMetrics
+    coeffs:
+      total_energy: 1.0
+      forces: 0.0
+
+  train_metrics: ${training_module.val_metrics}
+  test_metrics: ${training_module.val_metrics}
+
+  # Optimizer
+  optim:
+    _target_: torch.optim.Adam
+    lr: 0.001
+
+  # Learning rate scheduler
+  lr_scheduler:
+    _target_: torch.optim.lr_scheduler.ExponentialLR
+    gamma: 0.99
+
+  # Model architecture
+  model:
+    _target_: nequip.model.NequIPGNNModel
+    seed: 456
+    model_dtype: float32
+    type_names: ${model_type_names}
+    r_max: ${cutoff_radius}
+
+    # Bessel encoding
+    num_bessels: 8
+    bessel_trainable: false
+    polynomial_cutoff_p: 6
+
+    # Convnet layers
+    num_layers: ${num_layers}
+    l_max: ${l_max}
+    parity: true
+    num_features: ${num_features}
+
+    # Radial network (minimal)
+    radial_mlp_depth: 1
+    radial_mlp_width: 32
+
+    # Edge features
+    avg_num_neighbors: null
+
+    # Energy shifts and scales
+    per_type_energy_shifts: null
+    per_type_energy_scales: null
+    per_type_energy_shifts_trainable: false
+    per_type_energy_scales_trainable: false

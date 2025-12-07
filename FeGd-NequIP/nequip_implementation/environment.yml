@@ -1,0 +1,25 @@
+name: nequip-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - ipykernel
+  - ase
+  - pyyaml
+  - tqdm
+  - lmdb
+  - pip
+  - pip:
+      - torch>=2.2.0
+      - torchvision>=0.17.0        # ← add this line
+      - matscipy
+      - e3nn>=0.5.6,<0.6.0
+      - hydra-core
+      - lightning
+      - torchmetrics>=1.6.0
+      - requests
+      - nequip
+

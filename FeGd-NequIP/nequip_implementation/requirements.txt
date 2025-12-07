@@ -1,0 +1,14 @@
+numpy==1.26.4
+scipy==1.15.3
+torch==2.2.2+cu121
+nequip==0.16.1
+ase==3.26.0
+e3nn==0.5.8
+matscipy==1.2.0
+array-api-compat==1.12.0
+networkx==3.5
+lmdb==1.7.5
+tqdm==4.67.1
+matplotlib==3.10.7
+pytorch-lightning==2.6.0
+lightning==2.6.0
