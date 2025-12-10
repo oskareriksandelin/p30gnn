@@ -6,7 +6,6 @@ from tqdm import tqdm
 import torch
 from torch_geometric.data import Data, Dataset
 
-
 def parse_nml(path):
     """
     Parse a .nml file to extract features as a dictionary.
@@ -24,7 +23,6 @@ def parse_nml(path):
                 if nums:
                     feats[key.strip()] = np.array(nums, dtype=float)
     return feats
-
 
 def build_edges_from_neighbors(nbr_data, edge_features):
     """
@@ -69,7 +67,6 @@ def build_edges_from_neighbors(nbr_data, edge_features):
 
     return edge_index, edge_attr
 
-
 def extract_static_tensor(static_feats, n_atoms):
     """
     Convert static features dictionary to tensor
@@ -92,7 +89,6 @@ def extract_static_tensor(static_feats, n_atoms):
             row.extend(val.tolist())
         rows.append(row)
     return torch.tensor(rows, dtype=torch.float)
-
 
 class FeGdMagneticDataset(Dataset):
     """

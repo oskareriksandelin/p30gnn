@@ -17,7 +17,7 @@ def create_nequip_dataset(data_root='data', output_file='fegd_dataset.xyz', syst
     from ase.io import write
     
     if systems is None:
-        systems = [2, 3, 4, 5, 6, 7, 8, 9]
+        systems = [2]
     
     all_structures = []
     
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         structures = create_nequip_dataset(
             data_root=data_root,
             output_file=output_file,
-            systems=[2, 3, 4, 5, 6, 7, 8, 9]
+            systems=[2]
         )
         print(f"\n✓ Successfully created dataset with {len(structures)} structures")
     except Exception as e:

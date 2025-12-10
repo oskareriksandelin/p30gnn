@@ -40,21 +40,60 @@ data:
 
   # here we take an ASE-readable file (in extxyz format) and split it into train:val:test = 80:10:10
   split_dataset:
-    file_path: fegd_dataset.xyz
+    file_path: ../../data/fegd_dataset.xyz
     train: 0.8
     val: 0.1
     test: 0.1
+  
+  # `transforms` convert data from the Dataset to a form that can be used by the ML model
+  transforms:
+    # the models only know atom types, which can be different from the chemical species (e.g. C, H)
+    # in this case, the atom types are the same as the chemical species (H, C, O, Cu), so we can omit
+    # `chemical_species_to_atom_type_map` and it will default to an identity mapping
+    # if `model_type_names` were something like ["my_H", "carbon", "oxygen", "copper"], then you would need
+    # to explicitly provide the mapping: chemical_species_to_atom_type_map: {H: my_H, C: carbon, O: oxygen, Cu: copper}
+    - _target_: nequip.data.transforms.ChemicalSpeciesToAtomTypeMapper
+      model_type_names: ${model_type_names}
+      # chemical_species_to_atom_type_map: ${list_to_identity_dict:${chemical_species}}
+    # data doesn't usually come with a neighborlist -- this transform prepares the neighborlist
+    - _target_: nequip.data.transforms.NeighborListTransform
+      r_max: ${cutoff_radius}
 
+
+  # the following are torch.utils.data.DataLoader configs,
+  # excluding the arguments `dataset` and `collate_fn`
+  # https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 8
+    num_workers: 0
+    shuffle: false
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 16
+    num_workers: ${data.train_dataloader.num_workers}  # we want to use the same num_workers -- variable interpolation helps
+  test_dataloader: ${data.val_dataloader}  # variable interpolation comes in handy again
+
+  
+# =============
+#    TRAINER
+# =============
+# `trainer` is a `Lightning.Trainer` object (https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api)
 trainer:
-  _target_: lightning.pytorch.Trainer
-  max_epochs: 50
-  # ... trainer settings
+  _target_: lightning.Trainer
+  accelerator: gpu
+  enable_checkpointing: true
+  max_epochs: 20
+  max_time: 00:10:00:00
+  log_every_n_steps: 20       # how often to log
 
-training_module:
-  _target_: nequip.train.NequIPLightningModule
-  model:
-    # model architecture config
-  loss:
-    # loss configuration
-  val_metrics:
-    # validation metrics
+  # use any Lightning supported logger
+  logger:
+    # Lightning wandb logger https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.loggers.wandb.html#module-lightning.pytorch.loggers.wandb
+    _target_: lightning.pytorch.loggers.wandb.WandbLogger
+    project: nequip
+    name: tutorial
+    save_dir: ${hydra:runtime.output_dir}  # use resolver to place wandb logs in hydra's output directory
+
+  # use any Lightning callbacks https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks
+  # and any custom callbacks that subclass Lightning's Callback parent class
