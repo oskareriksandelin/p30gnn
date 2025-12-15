@@ -128,12 +128,13 @@ class FeGdMagneticDataset(Dataset):
     def _load_all_systems(self):
         for sys in tqdm(self.systems, desc="Loading systems"):
             path = os.path.join(self.root, f'FeGd_data_POSCAR_{sys}')
+            path_b_data = os.path.join(self.root, f'fields/POSCAR_{sys}')
 
             pos = pd.read_csv(f'{path}/coord.FeGd_100.out', sep=r'\s+', header=None,
                               names=['id','x','y','z','i1','i2'])[['x','y','z']]
 
-            B = pd.read_csv(f'{path}/befftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
-                            names=['Iter','Site','Replica','B_x','B_y','B_z','B'])
+            B = pd.read_csv(f'{path_b_data}/bintefftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
+                            names=['Iter','Site','Replica','B_x','B_y','B_z', 'B', 'sld_x', 'sld_y', 'sld_z', 'sld'])
 
             m = pd.read_csv(f'{path}/moment.FeGd_100.out', sep=r'\s+', engine='python',
                             header=None, comment='#',
@@ -148,7 +149,7 @@ class FeGdMagneticDataset(Dataset):
 
             # cache data so we don't reload every time
             self.cache[sys] = dict(pos=pos, B=B, m=m, nbr=nbr, static=static)
-            
+
             # build index map for (system, timestep)
             iter_vals = sorted(B['Iter'].unique())  # use real Iter values from the file
             for t in iter_vals:
@@ -206,7 +207,7 @@ class FeGdMagneticDataset(Dataset):
         # edges
         if self.cutoff_dist: # apply cutoff
             nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
-            
+
         edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
 
         return Data(

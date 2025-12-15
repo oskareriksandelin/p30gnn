@@ -2,6 +2,10 @@ import torch
 import numpy as np
 from scipy.special import sph_harm
 
+from tqdm import tqdm
+from torch.nn.functional import mse_loss
+
+
 #################### NORMALIZATION UTILITIES ####################
 def compute_normalization_stats(dataset):
     """
@@ -120,3 +124,43 @@ def basis_transformation(coord, l_max=2):
     res = np.concatenate([r[:, np.newaxis], Y_lm.T], axis=1)  # shape = (num_edges, 1 + (l_max+1)^2)
     
     return res
+
+##################### MODEL TRAINERS and VALIDATION  ####################
+
+
+def train_one_epoch(model, loader, optimizer, device):
+    model.train()
+    total_loss = 0.0
+
+    for batch in tqdm(loader, desc="Training", leave=False):
+        batch = batch.to(device)
+
+        pred = model(batch)     # [num_nodes_total, 3]
+        target = batch.y        # [num_nodes_total, 3]
+
+        loss = mse_loss(pred, target)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        total_loss += float(loss.item())
+
+    return total_loss / len(loader)
+
+
+def evaluate(model, loader, device):
+    model.eval()
+    total_loss = 0.0
+
+    with torch.no_grad():
+        for batch in tqdm(loader, desc="Validating", leave=False):
+            batch = batch.to(device)
+
+            pred = model(batch)
+            target = batch.y
+
+            loss = mse_loss(pred, target)
+            total_loss += float(loss.item())
+
+    return total_loss / len(loader)
