@@ -111,15 +111,17 @@ class FeGdMagneticDataset(Dataset):
         edge_features (str or list): 'all' to use all available edge features, or list of specific features to include e.g ['dx', 'dy', 'rij']
                 \n 'dx', 'dy', 'dz': relative position components
                 \n 'rij': distance between atoms
+        transform: torchvision transforms to apply (e.g. augment+normalize)
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_=None, use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
-        
+        self.transform_ = transform_
+
         self.cache = {}
         self.index_map = []
 
@@ -210,6 +212,9 @@ class FeGdMagneticDataset(Dataset):
 
         edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
 
+        # Data Augmentation and apply data augmentation
+        if self.transform_:
+            x = self.transform_(x)
         return Data(
             x=x,
             edge_index=edge_index,
