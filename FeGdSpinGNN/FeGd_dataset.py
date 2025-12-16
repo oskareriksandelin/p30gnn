@@ -128,12 +128,12 @@ class FeGdMagneticDataset(Dataset):
     def _load_all_systems(self):
         for sys in tqdm(self.systems, desc="Loading systems"):
             path = os.path.join(self.root, f'FeGd_data_POSCAR_{sys}')
-            path_b_data = os.path.join(self.root, f'fields/POSCAR_{sys}')
+            #path_b_data = os.path.join(self.root, f'fields/POSCAR_{sys}')
 
             pos = pd.read_csv(f'{path}/coord.FeGd_100.out', sep=r'\s+', header=None,
                               names=['id','x','y','z','i1','i2'])[['x','y','z']]
 
-            B = pd.read_csv(f'{path_b_data}/bintefftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
+            B = pd.read_csv(f'{path}/bintefftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
                             names=['Iter','Site','Replica','B_x','B_y','B_z', 'B', 'sld_x', 'sld_y', 'sld_z', 'sld'])
 
             m = pd.read_csv(f'{path}/moment.FeGd_100.out', sep=r'\s+', engine='python',
@@ -224,27 +224,14 @@ class FeGdMagneticDataset(Dataset):
 if __name__ == "__main__":
     from time import time
     start = time()
-    dataset = FeGdMagneticDataset(
-        root=r'FeGd',
-        systems=[2],
-        cutoff_dist=0.3,  # example cutoff distance
-        edge_features='ALL',  # example edge features
-        use_static_features=False, # probaly not needed for now  
-    )
-    print(f"Dataset loaded in {time() - start:.2f} seconds")
     
-    print(f"Dataset size: {len(dataset)}")
-    print(f"\nFirst graph:")
-    time_start = time()
-    data = dataset[1]
-    print(f"Graph loaded in {time() - time_start:.2f} seconds")
-    print("Graph info for first data point:")
-    print(f"Nodes: {data.num_nodes}")
-    print(f"Edges: {data.num_edges}")
-    print(f"Node features shape: {data.x.shape}")
-    print(f"Edge features shape: {data.edge_attr.shape}, ")
-    print(f"Target shape: {data.y.shape}")
-    print(f"System ID: {data.system_id}")
-    print(f"Timestep: {data.timestep}")
-    print(f"First atom node features:\n{data.x[0]}")
-    print(f"First neighbor edge features:\n{data.edge_attr[0]}")
+    data_path = f'/python/deep_learning/p30gnn/data'
+    train_dataset = FeGdMagneticDataset(data_path, systems=[2, 3, 4, 5], cutoff_dist=0.51)
+    val_dataset = FeGdMagneticDataset(data_path, systems=[6, 7], cutoff_dist=0.51)
+    test_dataset = FeGdMagneticDataset(data_path, systems=[8, 9], cutoff_dist=0.51)
+    
+    print(f"Dataset loaded in {time() - start:.2f} seconds")
+
+    # create the train, val and test_dataset and store them in the same directory as data_path
+    
+    
