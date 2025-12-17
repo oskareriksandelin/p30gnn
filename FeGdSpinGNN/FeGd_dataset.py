@@ -198,9 +198,19 @@ class FeGdMagneticDataset(Dataset):
         moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float) #spin moments as node features
         y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float) #magnetic field as target
         
+        # edges
+        if self.cutoff_dist: # apply cutoff
+            nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
+
+        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
+
         # Apply augmentation if specified
         if self.transform_rotate is not None:
-            moment, y, pos = self.transform_rotate(moment, y, pos)
+            rel_pos = edge_attr[:, :3] #relative position vector
+            moment, y, pos, rel_pos = self.transform_rotate(moment, y, pos, rel_pos)
+            edge_attr[:, :3] = rel_pos
+
+
 
         # Set up the node features
         x_parts = [
@@ -213,11 +223,7 @@ class FeGdMagneticDataset(Dataset):
 
         x = torch.cat(x_parts, dim=1)
 
-        # edges
-        if self.cutoff_dist: # apply cutoff
-            nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
 
-        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
         
         return Data(
             x=x,
