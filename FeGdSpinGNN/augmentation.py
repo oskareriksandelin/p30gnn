@@ -43,6 +43,4 @@ def RandomRotationTransform(moment, B, pos):
 
     return rotated_moment, rotated_B, rotated_pos
 
-def mirror_transform(moment, B, pos):
-
 
