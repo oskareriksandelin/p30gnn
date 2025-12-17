@@ -113,12 +113,14 @@ class FeGdMagneticDataset(Dataset):
                 \n 'rij': distance between atoms
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', use_static_features=False, load_energy=False, include_z=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
+        self.load_energy = load_energy
+        self.include_z = include_z
         
         self.cache = {}
         self.index_map = []
@@ -145,9 +147,26 @@ class FeGdMagneticDataset(Dataset):
             static = None
             if self.use_static_features:
                 static = self._load_static_features(sys)
+            
+            energy = None
+            if self.load_energy:
+                energy_file = f'{path}/totenergy.FeGd_100.out'
+                if os.path.exists(energy_file):
+                    # Read only first two columns: Iter and Tot (total energy)
+                    energy = pd.read_csv(
+                        energy_file, 
+                        sep=r'\s+', 
+                        comment='#',
+                        header=None,
+                        usecols=[0, 1],  # Only read first two columns
+                        names=['Iter', 'Tot']
+                    )
+                else:
+                    print(f"Warning: Energy file not found for system {sys}: {energy_file}")
+
 
             # cache data so we don't reload every time
-            self.cache[sys] = dict(pos=pos, B=B, m=m, nbr=nbr, static=static)
+            self.cache[sys] = dict(pos=pos, B=B, m=m, nbr=nbr, static=static, energy=energy)
             
             # build index map for (system, timestep)
             iter_vals = sorted(B['Iter'].unique())  # use real Iter values from the file
@@ -173,6 +192,7 @@ class FeGdMagneticDataset(Dataset):
         m_df = data_cache['m']
         nbr_df = data_cache['nbr']
         static = data_cache['static']
+        energy_df = data_cache['energy']
 
         pos = torch.tensor(pos_df.values, dtype=torch.float)
         n_atoms = len(pos)
@@ -198,6 +218,12 @@ class FeGdMagneticDataset(Dataset):
             moment
         ]
 
+        # Optionally add atomic numbers (needed for SchNet)
+        z = None
+        if self.include_z:
+            z = torch.where(node_type[:,0] == 0, 64, 26).long()  # Fe=26, Gd=64
+            Data.z = z
+
         if static is not None:
             x_parts.append(extract_static_tensor(static, n_atoms))
 
@@ -209,8 +235,18 @@ class FeGdMagneticDataset(Dataset):
             
         edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
 
+        # Extract energy for this timestep if available
+        energy = None
+        if energy_df is not None:
+            energy_t = energy_df[energy_df['Iter'] == t]
+            if len(energy_t) > 0:
+                energy = torch.tensor([energy_t['Tot'].values[0]], dtype=torch.float)
+
+
         return Data(
             x=x,
+            energy=energy,
+            z=z,
             edge_index=edge_index,
             edge_attr=edge_attr,
             y=y,
@@ -229,8 +265,11 @@ if __name__ == "__main__":
         cutoff_dist=0.3,  # example cutoff distance
         edge_features='ALL',  # example edge features
         use_static_features=False, # probaly not needed for now  
+        load_energy=False,
+        include_z=False
     )
     print(f"Dataset loaded in {time() - start:.2f} seconds")
+    
     
     print(f"Dataset size: {len(dataset)}")
     print(f"\nFirst graph:")
