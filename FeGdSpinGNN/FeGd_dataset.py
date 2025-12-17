@@ -114,13 +114,13 @@ class FeGdMagneticDataset(Dataset):
         transform: torchvision transforms to apply (e.g. augment+normalize)
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_=None, use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_rotate=None, use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
-        self.transform_ = transform_
+        self.transform_rotate = transform_rotate
 
         self.cache = {}
         self.index_map = []
@@ -163,7 +163,7 @@ class FeGdMagneticDataset(Dataset):
         # Note: sorted in reverse order to match atom indexing with Gd first.
         files = sorted([f for f in os.listdir(nml_dir) if f.startswith(('Fe', 'Gd'))], reverse=True)
         return {i+1: parse_nml(os.path.join(nml_dir, f)) for i, f in enumerate(files)}
-
+    
     def __len__(self):
         return len(self.index_map)
 
@@ -184,6 +184,8 @@ class FeGdMagneticDataset(Dataset):
         node_type = torch.zeros((n_atoms, 2), dtype=torch.float)
         fe = torch.tensor([1.0, 0.0])
         gd = torch.tensor([0.0, 1.0])
+
+        # Each cell has 24 Gd and 76 Fe atoms, each cell repeated 8 times but time evolved independently
         for i in range(8):
             start = i * 100
             node_type[start:start+24] = gd
@@ -193,9 +195,14 @@ class FeGdMagneticDataset(Dataset):
         m_t = m_df[m_df['Iter'] == t].sort_values('Site')
         B_t = B_df[B_df['Iter'] == t].sort_values('Site')
 
-        moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float)
-        y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float)
+        moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float) #spin moments as node features
+        y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float) #magnetic field as target
+        
+        # Apply augmentation if specified
+        if self.transform_rotate is not None:
+            moment, y, pos = self.transform_rotate(moment, y, pos)
 
+        # Set up the node features
         x_parts = [
             node_type,
             moment
@@ -211,10 +218,7 @@ class FeGdMagneticDataset(Dataset):
             nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
 
         edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
-
-        # Data Augmentation and apply data augmentation
-        if self.transform_:
-            x = self.transform_(x)
+        
         return Data(
             x=x,
             edge_index=edge_index,
@@ -224,7 +228,6 @@ class FeGdMagneticDataset(Dataset):
             system_id=sys,
             timestep=t
         )
-    
 
 if __name__ == "__main__":
     from time import time
