@@ -111,15 +111,17 @@ class FeGdMagneticDataset(Dataset):
         edge_features (str or list): 'all' to use all available edge features, or list of specific features to include e.g ['dx', 'dy', 'rij']
                 \n 'dx', 'dy', 'dz': relative position components
                 \n 'rij': distance between atoms
+        transform: torchvision transforms to apply (e.g. augment+normalize)
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_rotate=None, use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
-        
+        self.transform_rotate = transform_rotate
+
         self.cache = {}
         self.index_map = []
 
@@ -128,12 +130,13 @@ class FeGdMagneticDataset(Dataset):
     def _load_all_systems(self):
         for sys in tqdm(self.systems, desc="Loading systems"):
             path = os.path.join(self.root, f'FeGd_data_POSCAR_{sys}')
+            #path_b_data = os.path.join(self.root, f'fields/POSCAR_{sys}')
 
             pos = pd.read_csv(f'{path}/coord.FeGd_100.out', sep=r'\s+', header=None,
                               names=['id','x','y','z','i1','i2'])[['x','y','z']]
 
-            B = pd.read_csv(f'{path}/befftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
-                            names=['Iter','Site','Replica','B_x','B_y','B_z','B'])
+            B = pd.read_csv(f'{path}/bintefftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
+                            names=['Iter','Site','Replica','B_x','B_y','B_z', 'B', 'sld_x', 'sld_y', 'sld_z', 'sld'])
 
             m = pd.read_csv(f'{path}/moment.FeGd_100.out', sep=r'\s+', engine='python',
                             header=None, comment='#',
@@ -148,7 +151,7 @@ class FeGdMagneticDataset(Dataset):
 
             # cache data so we don't reload every time
             self.cache[sys] = dict(pos=pos, B=B, m=m, nbr=nbr, static=static)
-            
+
             # build index map for (system, timestep)
             iter_vals = sorted(B['Iter'].unique())  # use real Iter values from the file
             for t in iter_vals:
@@ -160,7 +163,7 @@ class FeGdMagneticDataset(Dataset):
         # Note: sorted in reverse order to match atom indexing with Gd first.
         files = sorted([f for f in os.listdir(nml_dir) if f.startswith(('Fe', 'Gd'))], reverse=True)
         return {i+1: parse_nml(os.path.join(nml_dir, f)) for i, f in enumerate(files)}
-
+    
     def __len__(self):
         return len(self.index_map)
 
@@ -181,6 +184,8 @@ class FeGdMagneticDataset(Dataset):
         node_type = torch.zeros((n_atoms, 2), dtype=torch.float)
         fe = torch.tensor([1.0, 0.0])
         gd = torch.tensor([0.0, 1.0])
+
+        # Each cell has 24 Gd and 76 Fe atoms, each cell repeated 8 times but time evolved independently
         for i in range(8):
             start = i * 100
             node_type[start:start+24] = gd
@@ -190,9 +195,14 @@ class FeGdMagneticDataset(Dataset):
         m_t = m_df[m_df['Iter'] == t].sort_values('Site')
         B_t = B_df[B_df['Iter'] == t].sort_values('Site')
 
-        moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float)
-        y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float)
+        moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float) #spin moments as node features
+        y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float) #magnetic field as target
+        
+        # Apply augmentation if specified
+        if self.transform_rotate is not None:
+            moment, y, pos = self.transform_rotate(moment, y, pos)
 
+        # Set up the node features
         x_parts = [
             node_type,
             moment
@@ -206,9 +216,9 @@ class FeGdMagneticDataset(Dataset):
         # edges
         if self.cutoff_dist: # apply cutoff
             nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
-            
-        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
 
+        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
+        
         return Data(
             x=x,
             edge_index=edge_index,
@@ -218,32 +228,18 @@ class FeGdMagneticDataset(Dataset):
             system_id=sys,
             timestep=t
         )
-    
 
 if __name__ == "__main__":
     from time import time
     start = time()
-    dataset = FeGdMagneticDataset(
-        root=r'FeGd',
-        systems=[2],
-        cutoff_dist=0.3,  # example cutoff distance
-        edge_features='ALL',  # example edge features
-        use_static_features=False, # probaly not needed for now  
-    )
-    print(f"Dataset loaded in {time() - start:.2f} seconds")
     
-    print(f"Dataset size: {len(dataset)}")
-    print(f"\nFirst graph:")
-    time_start = time()
-    data = dataset[1]
-    print(f"Graph loaded in {time() - time_start:.2f} seconds")
-    print("Graph info for first data point:")
-    print(f"Nodes: {data.num_nodes}")
-    print(f"Edges: {data.num_edges}")
-    print(f"Node features shape: {data.x.shape}")
-    print(f"Edge features shape: {data.edge_attr.shape}, ")
-    print(f"Target shape: {data.y.shape}")
-    print(f"System ID: {data.system_id}")
-    print(f"Timestep: {data.timestep}")
-    print(f"First atom node features:\n{data.x[0]}")
-    print(f"First neighbor edge features:\n{data.edge_attr[0]}")
+    data_path = f'/python/deep_learning/p30gnn/data'
+    train_dataset = FeGdMagneticDataset(data_path, systems=[2, 3, 4, 5], cutoff_dist=0.51)
+    val_dataset = FeGdMagneticDataset(data_path, systems=[6, 7], cutoff_dist=0.51)
+    test_dataset = FeGdMagneticDataset(data_path, systems=[8, 9], cutoff_dist=0.51)
+    
+    print(f"Dataset loaded in {time() - start:.2f} seconds")
+
+    # create the train, val and test_dataset and store them in the same directory as data_path
+    
+    
