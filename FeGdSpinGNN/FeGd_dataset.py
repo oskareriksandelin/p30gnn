@@ -114,7 +114,7 @@ class FeGdMagneticDataset(Dataset):
         transform: torchvision transforms to apply (e.g. augment+normalize)
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_rotate=None, transform_mirror=None, use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', transform_rotate=None, transform_mirror=None, use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
