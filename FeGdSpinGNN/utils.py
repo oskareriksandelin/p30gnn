@@ -5,6 +5,18 @@ from scipy.special import sph_harm
 from tqdm import tqdm
 from torch.nn.functional import mse_loss
 
+"""
+Utils for FeGdSpinGNN: normalization, basis transformation, training and evaluation loops, dataset statistics.
+
+Callable functions:
+    compute_normalization_stats(dataset)
+    normalize_data(data, stats)
+    denormalize_targets(y_norm, stats)
+    basis_transformation(coord, l_max=2)
+    train_one_epoch(model, loader, optimizer, device)
+    evaluate(model, loader, device)
+    Statistics(dataset) class for dataset statistics.
+"""
 
 #################### NORMALIZATION UTILITIES ####################
 def compute_normalization_stats(dataset):
