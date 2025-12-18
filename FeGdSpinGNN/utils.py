@@ -13,7 +13,6 @@ def compute_normalization_stats(dataset):
     
     Args:
         dataset: List of PyG Data objects or FeGdMagneticDataset
-        
     Returns:
         stats: Dict with normalization parameters
     """

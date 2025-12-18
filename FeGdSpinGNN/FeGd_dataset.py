@@ -210,8 +210,6 @@ class FeGdMagneticDataset(Dataset):
             moment, y, pos, rel_pos = self.transform_rotate(moment, y, pos, rel_pos)
             edge_attr[:, :3] = rel_pos
 
-
-
         # Set up the node features
         x_parts = [
             node_type,
