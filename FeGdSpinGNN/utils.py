@@ -13,6 +13,7 @@ def compute_normalization_stats(dataset):
     
     Args:
         dataset: List of PyG Data objects or FeGdMagneticDataset
+        
     Returns:
         stats: Dict with normalization parameters
     """
@@ -163,3 +164,115 @@ def evaluate(model, loader, device):
             total_loss += float(loss.item())
 
     return total_loss / len(loader)
+
+class Statistics:
+    """
+    Compute basic statistics of the dataset: number of each node, b-field of each node, 
+    spin of each node, atom type of each node and more.
+
+    Args:
+        dataset: PyTorch Geometric Dataset (e.g., FeGdMagneticDataset)
+    Callable methods:
+        summary(): Print a summary of dataset statistics.
+    Callable attributes:
+        n_samples: Total number of samples in the dataset.
+        n_nodes_mean, n_nodes_std, n_nodes_min, n_nodes_max: Statistics for number of nodes per graph. 
+        n_edges_mean, n_edges_std, n_edges_min, n_edges_max: Statistics for number of edges per graph.
+        fe_count_mean, fe_count_std: Mean and std of number of Fe atoms per graph.
+        gd_count_mean, gd_count_std: Mean and std of number of Gd atoms per
+        graph.
+        moment_mag_mean, moment_mag_std, moment_mag_min, moment_mag_max: Statistics for
+        spin moment magnitudes across all nodes.
+        b_field_mag_mean, b_field_mag_std, b_field_mag_min, b_field_mag_max: Statistics for
+        magnetic field magnitudes across all nodes.
+    """
+    
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.n_samples = len(dataset)
+        self._compute_statistics()
+    
+    def _compute_statistics(self):
+        """Compute all statistics from the dataset."""
+        # Initialize lists to collect data
+        n_nodes_list = []
+        n_edges_list = []
+        fe_counts = []
+        gd_counts = []
+        moment_magnitudes = []
+        b_field_magnitudes = []
+        
+        # Iterate through dataset
+        for data in tqdm(self.dataset, desc="Computing statistics"):
+            n_nodes = data.x.shape[0]
+            n_edges = data.edge_index.shape[1]
+            n_nodes_list.append(n_nodes)
+            n_edges_list.append(n_edges)
+            
+            # Count Fe and Gd atoms (node_type one-hot: Fe=[1,0], Gd=[0,1])
+            fe_count = (data.x[:, 0] > 0.5).sum().item()
+            gd_count = (data.x[:, 1] > 0.5).sum().item()
+            fe_counts.append(fe_count)
+            gd_counts.append(gd_count)
+            
+            # Compute spin moment magnitudes
+            moments = data.x[:, 2:5]  # M_x, M_y, M_z
+            moment_mag = torch.norm(moments, dim=1)
+            moment_magnitudes.append(moment_mag)
+            
+            # Compute magnetic field magnitudes
+            b_field_mag = torch.norm(data.y, dim=1)
+            b_field_magnitudes.append(b_field_mag)
+        
+        # Compute aggregate statistics
+        self.n_nodes_mean = np.mean(n_nodes_list)
+        self.n_nodes_std = np.std(n_nodes_list)
+        self.n_nodes_min = np.min(n_nodes_list)
+        self.n_nodes_max = np.max(n_nodes_list)
+        
+        self.n_edges_mean = np.mean(n_edges_list)
+        self.n_edges_std = np.std(n_edges_list)
+        self.n_edges_min = np.min(n_edges_list)
+        self.n_edges_max = np.max(n_edges_list)
+        
+        self.fe_count_mean = np.mean(fe_counts)
+        self.fe_count_std = np.std(fe_counts)
+        self.gd_count_mean = np.mean(gd_counts)
+        self.gd_count_std = np.std(gd_counts)
+        
+        # Moment statistics
+        moment_mag_all = torch.cat(moment_magnitudes)
+        self.moment_mag_mean = moment_mag_all.mean().item()
+        self.moment_mag_std = moment_mag_all.std().item()
+        self.moment_mag_min = moment_mag_all.min().item()
+        self.moment_mag_max = moment_mag_all.max().item()
+        
+        # B-field statistics
+        b_field_mag_all = torch.cat(b_field_magnitudes)
+        self.b_field_mag_mean = b_field_mag_all.mean().item()
+        self.b_field_mag_std = b_field_mag_all.std().item()
+        self.b_field_mag_min = b_field_mag_all.min().item()
+        self.b_field_mag_max = b_field_mag_all.max().item()
+    
+    def summary(self):
+        """Print a summary of dataset statistics."""
+        print("=" * 60)
+        print("DATASET STATISTICS SUMMARY")
+        print("=" * 60)
+        print(f"\nTotal samples: {self.n_samples}")
+        print(f"\nNODES PER GRAPH:")
+        print(f"  Mean: {self.n_nodes_mean:.2f} ± {self.n_nodes_std:.2f}")
+        print(f"  Range: [{self.n_nodes_min}, {self.n_nodes_max}]")
+        print(f"\nEDGES PER GRAPH:")
+        print(f"  Mean: {self.n_edges_mean:.2f} ± {self.n_edges_std:.2f}")
+        print(f"  Range: [{self.n_edges_min}, {self.n_edges_max}]")
+        print(f"\nATOM TYPE DISTRIBUTION:")
+        print(f"  Fe atoms per graph: {self.fe_count_mean:.2f} ± {self.fe_count_std:.2f}")
+        print(f"  Gd atoms per graph: {self.gd_count_mean:.2f} ± {self.gd_count_std:.2f}")
+        print(f"\nSPIN MOMENT MAGNITUDE:")
+        print(f"  Mean: {self.moment_mag_mean:.4f} ± {self.moment_mag_std:.4f}")
+        print(f"  Range: [{self.moment_mag_min:.4f}, {self.moment_mag_max:.4f}]")
+        print(f"\nMAGNETIC FIELD MAGNITUDE:")
+        print(f"  Mean: {self.b_field_mag_mean:.4f} ± {self.b_field_mag_std:.4f}")
+        print(f"  Range: [{self.b_field_mag_min:.4f}, {self.b_field_mag_max:.4f}]")
+        print("=" * 60)
