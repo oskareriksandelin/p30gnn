@@ -277,44 +277,54 @@ class Statistics:
         self.neighbor_count_std = neighbor_counts_all.std().item()
         self.neighbor_count_min = neighbor_counts_all.min().item()
         self.neighbor_count_max = neighbor_counts_all.max().item()
-    def histograms(self):
+    def histograms(self, num_bins=50):
         """Generate histograms for various dataset attributes."""
         import matplotlib.pyplot as plt
-
-        # Number of nodes per graph
-        n_nodes_list = [data.x.shape[0] for data in self.dataset]
-        plt.figure()
-        plt.hist(n_nodes_list, bins=30, alpha=0.7, color='blue')
-        plt.title('Histogram of Number of Nodes per Graph')
-        plt.xlabel('Number of Nodes')
-        plt.ylabel('Frequency')
-        plt.show()
-
-        # Number of edges per graph
-        n_edges_list = [data.edge_index.shape[1] for data in self.dataset]
-        plt.figure()
-        plt.hist(n_edges_list, bins=30, alpha=0.7, color='green')
-        plt.title('Histogram of Number of Edges per Graph')
-        plt.xlabel('Number of Edges')
-        plt.ylabel('Frequency')
-        plt.show()
 
         # Spin moment magnitudes
         moment_magnitudes = torch.cat([torch.norm(data.x[:, 2:5], dim=1) for data in self.dataset])
         plt.figure()
-        plt.hist(moment_magnitudes.numpy(), bins=50, alpha=0.7, color='red')
+        plt.hist(moment_magnitudes.numpy(), bins=num_bins, alpha=0.7, color='red')
         plt.title('Histogram of Spin Moment Magnitudes')
         plt.xlabel('Moment Magnitude')
         plt.ylabel('Frequency')
         plt.show()
 
+        # Spin moments components
+        moment_x = torch.cat([data.x[:, 2] for data in self.dataset])
+        moment_y = torch.cat([data.x[:, 3] for data in self.dataset])
+        moment_z = torch.cat([data.x[:, 4] for data in self.dataset])
+        plt.figure()
+        plt.hist(moment_x.numpy(), bins=num_bins, alpha=0.5, label='M_x', color='blue')
+        plt.hist(moment_y.numpy(), bins=num_bins, alpha=0.5, label='M_y', color='green')
+        plt.hist(moment_z.numpy(), bins=num_bins, alpha=0.5, label='M_z', color='orange')
+        plt.title('Histogram of Spin Moment Components')
+        plt.xlabel('Moment Component Value')
+        plt.ylabel('Frequency')
+        plt.legend()
+        plt.show()  
+
         # Magnetic field magnitudes
         b_field_magnitudes = torch.cat([torch.norm(data.y, dim=1) for data in self.dataset])
         plt.figure()
-        plt.hist(b_field_magnitudes.numpy(), bins=50, alpha=0.7, color='purple')
+        plt.hist(b_field_magnitudes.numpy(), bins=num_bins, alpha=0.7, color='purple')
         plt.title('Histogram of Magnetic Field Magnitudes')
         plt.xlabel('B-field Magnitude')
         plt.ylabel('Frequency')
+        plt.show()
+
+        # Magnetic field components
+        b_field_x = torch.cat([data.y[:, 0] for data in self.dataset])
+        b_field_y = torch.cat([data.y[:, 1] for data in self.dataset])
+        b_field_z = torch.cat([data.y[:, 2] for data in self.dataset])
+        plt.figure()
+        plt.hist(b_field_x.numpy(), bins=num_bins, alpha=0.5, label='B_x', color='cyan')
+        plt.hist(b_field_y.numpy(), bins=num_bins, alpha=0.5, label='B_y', color='magenta')
+        plt.hist(b_field_z.numpy(), bins=num_bins, alpha=0.5, label='B_z', color='yellow')
+        plt.title('Histogram of Magnetic Field Components')
+        plt.xlabel('B-field Component Value')
+        plt.ylabel('Frequency')
+        plt.legend()
         plt.show()
 
 
@@ -323,16 +333,6 @@ class Statistics:
         print("=" * 60)
         print("DATASET STATISTICS SUMMARY")
         print("=" * 60)
-        print(f"\nTotal samples: {self.n_samples}")
-        print(f"\nNODES PER GRAPH:")
-        print(f"  Mean: {self.n_nodes_mean:.2f} ± {self.n_nodes_std:.2f}")
-        print(f"  Range: [{self.n_nodes_min}, {self.n_nodes_max}]")
-        print(f"\nEDGES PER GRAPH:")
-        print(f"  Mean: {self.n_edges_mean:.2f} ± {self.n_edges_std:.2f}")
-        print(f"  Range: [{self.n_edges_min}, {self.n_edges_max}]")
-        print(f"\nATOM TYPE DISTRIBUTION:")
-        print(f"  Fe atoms per graph: {self.fe_count_mean:.2f} ± {self.fe_count_std:.2f}")
-        print(f"  Gd atoms per graph: {self.gd_count_mean:.2f} ± {self.gd_count_std:.2f}")
         print(f"\nNEIGHBORS PER NODE:")
         print(f"  Mean: {self.neighbor_count_mean:.2f} ± {self.neighbor_count_std:.2f}")
         print(f"  Range: [{self.neighbor_count_min:.0f}, {self.neighbor_count_max:.0f}]")
