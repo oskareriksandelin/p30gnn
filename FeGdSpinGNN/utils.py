@@ -277,7 +277,47 @@ class Statistics:
         self.neighbor_count_std = neighbor_counts_all.std().item()
         self.neighbor_count_min = neighbor_counts_all.min().item()
         self.neighbor_count_max = neighbor_counts_all.max().item()
-    
+    def histograms(self):
+        """Generate histograms for various dataset attributes."""
+        import matplotlib.pyplot as plt
+
+        # Number of nodes per graph
+        n_nodes_list = [data.x.shape[0] for data in self.dataset]
+        plt.figure()
+        plt.hist(n_nodes_list, bins=30, alpha=0.7, color='blue')
+        plt.title('Histogram of Number of Nodes per Graph')
+        plt.xlabel('Number of Nodes')
+        plt.ylabel('Frequency')
+        plt.show()
+
+        # Number of edges per graph
+        n_edges_list = [data.edge_index.shape[1] for data in self.dataset]
+        plt.figure()
+        plt.hist(n_edges_list, bins=30, alpha=0.7, color='green')
+        plt.title('Histogram of Number of Edges per Graph')
+        plt.xlabel('Number of Edges')
+        plt.ylabel('Frequency')
+        plt.show()
+
+        # Spin moment magnitudes
+        moment_magnitudes = torch.cat([torch.norm(data.x[:, 2:5], dim=1) for data in self.dataset])
+        plt.figure()
+        plt.hist(moment_magnitudes.numpy(), bins=50, alpha=0.7, color='red')
+        plt.title('Histogram of Spin Moment Magnitudes')
+        plt.xlabel('Moment Magnitude')
+        plt.ylabel('Frequency')
+        plt.show()
+
+        # Magnetic field magnitudes
+        b_field_magnitudes = torch.cat([torch.norm(data.y, dim=1) for data in self.dataset])
+        plt.figure()
+        plt.hist(b_field_magnitudes.numpy(), bins=50, alpha=0.7, color='purple')
+        plt.title('Histogram of Magnetic Field Magnitudes')
+        plt.xlabel('B-field Magnitude')
+        plt.ylabel('Frequency')
+        plt.show()
+
+
     def summary(self):
         """Print a summary of dataset statistics."""
         print("=" * 60)
