@@ -2,17 +2,11 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import MessagePassing
 
+
 class NaiveEdgeConv(MessagePassing):
     """GNN layer that uses all edge features for message passing, ignoring equivariance."""
     def __init__(self, in_features, hidden_dim, out_features, dropout=0.1):
         super().__init__(aggr='add')
-
-        self.node_mlp = nn.Sequential(
-            nn.Linear(in_features + hidden_dim, hidden_dim),
-            nn.SiLU(),
-            nn.Dropout(0.1),  # Add regularization
-            nn.Linear(hidden_dim, out_features)
-        )
 
         # Use ALL edge features: node_i + node_j + [dx,dy,dz,rij]
         self.edge_mlp = nn.Sequential(
@@ -23,6 +17,12 @@ class NaiveEdgeConv(MessagePassing):
             nn.SiLU()
         )
 
+        self.node_mlp = nn.Sequential(
+            nn.Linear(in_features + hidden_dim, hidden_dim),
+            nn.SiLU(),
+            nn.Dropout(0.1),  # Add regularization
+            nn.Linear(hidden_dim, out_features)
+        )
 
     def forward(self, x, edge_index, edge_attr):
         # edge_attr should contain [dx, dy, dz, rij] as unit vectors + distance

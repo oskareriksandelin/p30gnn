@@ -121,7 +121,7 @@ class FeGdMagneticDataset(Dataset):
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
         self.transform_rotate = transform_rotate
-
+        
         self.cache = {}
         self.index_map = []
 
@@ -163,7 +163,7 @@ class FeGdMagneticDataset(Dataset):
         # Note: sorted in reverse order to match atom indexing with Gd first.
         files = sorted([f for f in os.listdir(nml_dir) if f.startswith(('Fe', 'Gd'))], reverse=True)
         return {i+1: parse_nml(os.path.join(nml_dir, f)) for i, f in enumerate(files)}
-    
+
     def __len__(self):
         return len(self.index_map)
 
