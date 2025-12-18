@@ -213,6 +213,7 @@ class Statistics:
         gd_counts = []
         moment_magnitudes = []
         b_field_magnitudes = []
+        neighbor_counts = []
         
         # Iterate through dataset
         for data in tqdm(self.dataset, desc="Computing statistics"):
@@ -235,6 +236,10 @@ class Statistics:
             # Compute magnetic field magnitudes
             b_field_mag = torch.norm(data.y, dim=1)
             b_field_magnitudes.append(b_field_mag)
+            
+            # Compute number of neighbors per node (node degree)
+            node_degrees = torch.bincount(data.edge_index[0], minlength=n_nodes).float()
+            neighbor_counts.append(node_degrees)
         
         # Compute aggregate statistics
         self.n_nodes_mean = np.mean(n_nodes_list)
@@ -265,6 +270,13 @@ class Statistics:
         self.b_field_mag_std = b_field_mag_all.std().item()
         self.b_field_mag_min = b_field_mag_all.min().item()
         self.b_field_mag_max = b_field_mag_all.max().item()
+        
+        # Neighbor count statistics
+        neighbor_counts_all = torch.cat(neighbor_counts)
+        self.neighbor_count_mean = neighbor_counts_all.mean().item()
+        self.neighbor_count_std = neighbor_counts_all.std().item()
+        self.neighbor_count_min = neighbor_counts_all.min().item()
+        self.neighbor_count_max = neighbor_counts_all.max().item()
     
     def summary(self):
         """Print a summary of dataset statistics."""
@@ -281,6 +293,9 @@ class Statistics:
         print(f"\nATOM TYPE DISTRIBUTION:")
         print(f"  Fe atoms per graph: {self.fe_count_mean:.2f} ± {self.fe_count_std:.2f}")
         print(f"  Gd atoms per graph: {self.gd_count_mean:.2f} ± {self.gd_count_std:.2f}")
+        print(f"\nNEIGHBORS PER NODE:")
+        print(f"  Mean: {self.neighbor_count_mean:.2f} ± {self.neighbor_count_std:.2f}")
+        print(f"  Range: [{self.neighbor_count_min:.0f}, {self.neighbor_count_max:.0f}]")
         print(f"\nSPIN MOMENT MAGNITUDE:")
         print(f"  Mean: {self.moment_mag_mean:.4f} ± {self.moment_mag_std:.4f}")
         print(f"  Range: [{self.moment_mag_min:.4f}, {self.moment_mag_max:.4f}]")
