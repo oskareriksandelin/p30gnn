@@ -24,7 +24,7 @@ class SpinConvLayer(MessagePassing):
         return self.mlp(tmp)
 
 
-class BFieldGNN(torch.nn.Module):
+class SimpleGNNModel(torch.nn.Module):
     """
     GNN model to predict magnetic B-field at each atom given atomic features and edge attributes.
     
