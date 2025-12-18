@@ -81,7 +81,7 @@ def MirrorTransformation(moment, B, pos, rel_pos):
     reflected_rel_pos = torch.stack([reflect_point(p) for p in rel_pos])
     # Reflect spin moments and magnetic fields
     reflected_moment = moment - 2 * (moment @ normal_vector)[:, None] * normal_vector
-    reflected_B = B - 2 * (B @ normal_vector) * normal_vector
+    reflected_B = B - 2 * (B @ normal_vector).unsqueeze(-1) * normal_vector
 
     return reflected_moment, reflected_B, reflected_pos, reflected_rel_pos
 
