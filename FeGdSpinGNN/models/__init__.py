@@ -1,3 +1,3 @@
 from .EquivariantGNN import EquivariantGNN
 from .NaiveFeGdBFieldModel import NaiveFeGdBFieldModel
-from .simple_gnn_model import SimpleGNNModel
+from .SimpleGNNModel import SimpleGNNModel

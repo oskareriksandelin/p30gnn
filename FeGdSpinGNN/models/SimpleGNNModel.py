@@ -51,7 +51,7 @@ class SimpleGNNModel(torch.nn.Module):
         
         # Output MLP to predict B-field per node
         self.output_mlp = Sequential(
-            Linear(hidden_dim, hidden_dim),
+            Linear(hidden_dim, hidden_dim // 2),
             ReLU(),
             Linear(hidden_dim // 2, output_dim)
         )
