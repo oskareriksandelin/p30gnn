@@ -2,7 +2,7 @@
 import torch
 import math
 
-def RandomRotationTransform(moment, B, pos):
+def RandomRotationTransform(moment, B, pos, rel_pos):
     """
     Apply a random rotation to the spin moments, magnetic fields, and positions.
     Args:
@@ -40,5 +40,6 @@ def RandomRotationTransform(moment, B, pos):
     rotated_moment = moment @ R.T
     rotated_B = B @ R.T
     rotated_pos = pos @ R.T
+    rotated_res_pos = rel_pos @ R.T
 
-    return rotated_moment, rotated_B, rotated_pos
+    return rotated_moment, rotated_B, rotated_pos, rotated_res_pos
