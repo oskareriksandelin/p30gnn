@@ -114,13 +114,14 @@ class FeGdMagneticDataset(Dataset):
         transform: torchvision transforms to apply (e.g. augment+normalize)
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_rotate=None, use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_rotate=None, transform_mirror=None, use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
         self.transform_rotate = transform_rotate
+        self.transform_mirror = transform_mirror
         
         self.cache = {}
         self.index_map = []
@@ -205,10 +206,13 @@ class FeGdMagneticDataset(Dataset):
         edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
 
         # Apply augmentation if specified
+        rel_pos = edge_attr[:, :3] #placeholder for relative position vector
         if self.transform_rotate is not None:
-            rel_pos = edge_attr[:, :3] #relative position vector
             moment, y, pos, rel_pos = self.transform_rotate(moment, y, pos, rel_pos)
-            edge_attr[:, :3] = rel_pos
+        if self.transform_mirror is not None:
+            moment, y, pos, rel_pos = self.transform_mirror(moment, y, pos, rel_pos)
+        edge_attr[:, :3] = rel_pos #redefine transformed relative position vector
+
 
         # Set up the node features
         x_parts = [
@@ -221,8 +225,6 @@ class FeGdMagneticDataset(Dataset):
 
         x = torch.cat(x_parts, dim=1)
 
-
-        
         return Data(
             x=x,
             edge_index=edge_index,
