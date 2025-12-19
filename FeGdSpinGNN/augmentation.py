@@ -46,11 +46,9 @@ def RandomRotationTransform(moment, B, pos, rel_pos):
 
     return rotated_moment, rotated_B, rotated_pos, rotated_res_pos
 
-def MirrorTransformation(moment, B, rel_pos, return_plane=False):
+def MirrorTransformation(moment, B, pos, rel_pos):
     """
-    Generate a random mirror matrix and reflect the spin moments, magnetic fields, and relative positions across the plane.
-    The vector direction mirrors without translation.
-
+    Generate a random parity transformation on of of the axes. 
     Args:
         moment (torch.Tensor): Spin moments tensor of shape (num_nodes, 3)
         B (torch.Tensor): Magnetic fields tensor of shape (3,)
@@ -62,20 +60,18 @@ def MirrorTransformation(moment, B, rel_pos, return_plane=False):
         reflected_pos (torch.Tensor): Reflected positions
         reflected_rel_pos (torch.Tensor): Reflected relative positions
     """
-    n = torch.randn(3)
-    n = n / n.norm()
-
-    R = torch.eye(3) - 2.0 * torch.outer(n, n)
+    R = torch.eye(3)
+    axis = torch.randint(0, 3, (1,)).item()
+    R[axis, axis] = -1  # Reflect across the chosen axis
 
     reflected_moment = moment @ R.T
     reflected_B = B @ R.T
+    reflected_pos = pos @ R.T
     reflected_rel_pos = rel_pos @ R.T
-    if return_plane:
-        point = torch.zeros(3)
-        normal = n
-        return reflected_moment, reflected_B, reflected_rel_pos, point, normal
-    else:
-        return reflected_moment, reflected_B, reflected_rel_pos
+    
+    #return reflected_moment, reflected_B, reflected_rel_pos    # to plot the relection plane
+    return reflected_moment, reflected_B, reflected_pos, reflected_rel_pos
+    
 
 def PermutationTransform():
     """
@@ -103,28 +99,26 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     # Generate random data
-    num_nodes = 2
+    num_nodes = 10
     pos = torch.randn((num_nodes, 3)) + 1.0  # center around [1, 1, 1]
     moment = torch.randn((num_nodes, 3))
     B = torch.randn(3)
 
-    rel_pos = pos - pos.mean(dim=0)  # relative positions
-    reflected_moment, reflected_B, _, point, normal = MirrorTransformation(moment, B, rel_pos, return_plane=True)
-    # Plot original and transformed data
+    reflected_moment, reflected_B, reflected_pos, _ = MirrorTransformation(moment, B, pos, pos)
+    res_mom, res_B, res_pos, _ = RandomRotationTransform(reflected_moment, reflected_B, reflected_pos, reflected_pos)
+
+    # Plot original and reflected data
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.quiver(0, 0, 0, B[0], B[1], B[2], color='r', label='Original B', length=0.5)
-    ax.quiver(0, 0, 0, reflected_B[0], reflected_B[1], reflected_B[2], color='b', label='Reflected B', length=0.5)
-    ax.scatter(pos[:,0], pos[:,1], pos[:,2], color='g', label='Original Positions')
-    ax.scatter(reflected_moment[:,0], reflected_moment[:,1], reflected_moment[:,2], color='m', label='Reflected Moments')
-    # Plot mirror plane
-    d = -point.dot(normal)
-    xx, yy = torch.meshgrid(torch.linspace(-2, 2, 10), torch.linspace(-2, 2, 10))
-    zz = (-normal[0] * xx - normal[1] * yy - d) / normal[2]
-    ax.plot_surface(xx.numpy(), yy.numpy(), zz.numpy(), alpha=0.5, color='y', label='Mirror Plane')
+    ax.quiver(0  , 0, 0, moment[0,0], moment[0,1], moment[0,2], color='b', label='Original Moment')
+    ax.quiver(0, 0, 0, reflected_moment[0,0], reflected_moment[0,1], reflected_moment[0,2], color='r', label='Reflected Moment')
+    ax.quiver(0, 0, 0, res_mom[0,0], res_mom[0,1], res_mom[0,2], color='g', label='Rotated Reflected Moment')
+    ax.set_xlim([-3, 3])
+    ax.set_ylim([-3, 3])
+    ax.set_zlim([-3, 3])
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.legend()
+    plt.title('Original, Reflected, and Rotated Reflected Spin Moments')
     plt.show()
-    
