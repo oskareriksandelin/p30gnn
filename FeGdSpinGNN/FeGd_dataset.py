@@ -236,16 +236,33 @@ class FeGdMagneticDataset(Dataset):
         )
 
 if __name__ == "__main__":
+    import sys
+    from pathlib import Path
     from time import time
+    
+    # Add the parent directory to sys.path to allow imports
+    sys.path.insert(0, str(Path(__file__).parent))
+    
+    from augmentation import RandomRotationTransform, MirrorTransformation
+    
     start = time()
+    cut_off = 0.25
+    # Get data path relative to this script's directory
+    data_path = Path(__file__).parent.parent / 'data'
     
-    data_path = f'/python/deep_learning/p30gnn/data'
-    train_dataset = FeGdMagneticDataset(data_path, systems=[2, 3, 4, 5], cutoff_dist=0.51)
-    val_dataset = FeGdMagneticDataset(data_path, systems=[6, 7], cutoff_dist=0.51)
-    test_dataset = FeGdMagneticDataset(data_path, systems=[8, 9], cutoff_dist=0.51)
-    
-    print(f"Dataset loaded in {time() - start:.2f} seconds")
-
-    # create the train, val and test_dataset and store them in the same directory as data_path
+    try:
+        train_dataset = FeGdMagneticDataset(str(data_path), systems=[2, 3, 4, 5], cutoff_dist=cut_off, transform_rotate=RandomRotationTransform, transform_mirror=MirrorTransformation)
+        val_dataset = FeGdMagneticDataset(str(data_path), systems=[6, 7], cutoff_dist=cut_off)
+        test_dataset = FeGdMagneticDataset(str(data_path), systems=[8, 9], cutoff_dist=cut_off)
+        
+        print(f"Dataset loaded in {time() - start:.2f} seconds")
+        print(f"Train samples: {len(train_dataset)}")
+        print(f"Val samples: {len(val_dataset)}")
+        print(f"Test samples: {len(test_dataset)}")
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
     
     

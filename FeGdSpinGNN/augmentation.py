@@ -46,11 +46,10 @@ def RandomRotationTransform(moment, B, pos, rel_pos):
 
     return rotated_moment, rotated_B, rotated_pos, rotated_res_pos
 
-def MirrorTransformation(moment, B, pos, rel_pos):
+def MirrorTransformation(moment, B, rel_pos, return_plane=False):
     """
-    Generates a random plane and reflect the spin moments, magnetic fields, and positions.
-    The cells corners are in [0, 0, 0] to [2, 2, 2], so the plane is generated within this range. The plane should be defined by a random normal vector from
-    the center of the cell [1, 1, 1].
+    Generate a random mirror matrix and reflect the spin moments, magnetic fields, and relative positions across the plane.
+    The vector direction mirrors without translation.
 
     Args:
         moment (torch.Tensor): Spin moments tensor of shape (num_nodes, 3)
@@ -63,27 +62,20 @@ def MirrorTransformation(moment, B, pos, rel_pos):
         reflected_pos (torch.Tensor): Reflected positions
         reflected_rel_pos (torch.Tensor): Reflected relative positions
     """
-    #TODO: Ensure that the plane intersects the cell
+    n = torch.randn(3)
+    n = n / n.norm()
 
-    # Generate a random normal vector for the plane
-    normal_vector = torch.randn(3)
-    normal_vector = normal_vector / torch.norm(normal_vector)
-    d = -torch.dot(normal_vector, torch.tensor([1.0, 1.0, 1.0]))  # Plane passes through the center [1, 1, 1]
+    R = torch.eye(3) - 2.0 * torch.outer(n, n)
 
-    # Function to reflect a point across the plane
-    def reflect_point(point):
-        distance = torch.dot(normal_vector, point) + d
-        reflected_point = point - 2 * distance * normal_vector
-        return reflected_point
-    
-    # Reflect positions
-    reflected_pos = torch.stack([reflect_point(p) for p in pos])
-    reflected_rel_pos = torch.stack([reflect_point(p) for p in rel_pos])
-    # Reflect spin moments and magnetic fields
-    reflected_moment = moment - 2 * (moment @ normal_vector)[:, None] * normal_vector
-    reflected_B = B - 2 * (B @ normal_vector).unsqueeze(-1) * normal_vector
-
-    return reflected_moment, reflected_B, reflected_pos, reflected_rel_pos
+    reflected_moment = moment @ R.T
+    reflected_B = B @ R.T
+    reflected_rel_pos = rel_pos @ R.T
+    if return_plane:
+        point = torch.zeros(3)
+        normal = n
+        return reflected_moment, reflected_B, reflected_rel_pos, point, normal
+    else:
+        return reflected_moment, reflected_B, reflected_rel_pos
 
 def PermutationTransform():
     """
@@ -93,3 +85,46 @@ def PermutationTransform():
     return permuted_moment, B, permuted_pos, permuted_rel_pos
     """
     pass 
+
+def main():
+    pass
+
+if __name__ == "__main__":
+    """
+    Test the MirrorTransformation function. 
+    Generate a random vector and reflect it across a random plane.
+    Plot the original and reflected vectors along with the plane.
+    1. Generate random data
+    2. Apply MirrorTransformation
+    3. Plot original and transformed data and the mirror plane
+    4. Verify correctness visually
+    """
+
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    # Generate random data
+    num_nodes = 2
+    pos = torch.randn((num_nodes, 3)) + 1.0  # center around [1, 1, 1]
+    moment = torch.randn((num_nodes, 3))
+    B = torch.randn(3)
+
+    rel_pos = pos - pos.mean(dim=0)  # relative positions
+    reflected_moment, reflected_B, _, point, normal = MirrorTransformation(moment, B, rel_pos, return_plane=True)
+    # Plot original and transformed data
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.quiver(0, 0, 0, B[0], B[1], B[2], color='r', label='Original B', length=0.5)
+    ax.quiver(0, 0, 0, reflected_B[0], reflected_B[1], reflected_B[2], color='b', label='Reflected B', length=0.5)
+    ax.scatter(pos[:,0], pos[:,1], pos[:,2], color='g', label='Original Positions')
+    ax.scatter(reflected_moment[:,0], reflected_moment[:,1], reflected_moment[:,2], color='m', label='Reflected Moments')
+    # Plot mirror plane
+    d = -point.dot(normal)
+    xx, yy = torch.meshgrid(torch.linspace(-2, 2, 10), torch.linspace(-2, 2, 10))
+    zz = (-normal[0] * xx - normal[1] * yy - d) / normal[2]
+    ax.plot_surface(xx.numpy(), yy.numpy(), zz.numpy(), alpha=0.5, color='y', label='Mirror Plane')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()
+    plt.show()
+    
