@@ -111,7 +111,7 @@ class FeGdMagneticDataset(Dataset):
         edge_features (str or list): 'all' to use all available edge features, or list of specific features to include e.g ['dx', 'dy', 'rij']
                 \n 'dx', 'dy', 'dz': relative position components
                 \n 'rij': distance between atoms
-        transform: torchvision transforms to apply (e.g. augment+normalize)
+        transform (methods): torchvision transforms to apply (e.g. augment+normalize)
     """
     
     def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', transform_rotate=None, transform_mirror=None, use_static_features=False):
