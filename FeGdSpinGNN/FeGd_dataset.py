@@ -15,7 +15,7 @@ def parse_nml(path):
     Returns:
         dict: {feature_key: feature_value_array}
     """
-    feats = {}
+    feats = {} 
     with open(path) as f:
         for line in f:
             if '=' in line and not line.strip().startswith('&'):
@@ -111,17 +111,18 @@ class FeGdMagneticDataset(Dataset):
         edge_features (str or list): 'all' to use all available edge features, or list of specific features to include e.g ['dx', 'dy', 'rij']
                 \n 'dx', 'dy', 'dz': relative position components
                 \n 'rij': distance between atoms
-        transform: torchvision transforms to apply (e.g. augment+normalize)
+        transform (methods): torchvision transforms to apply (e.g. augment+normalize)
     """
     
-    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all' , transform_rotate=None, use_static_features=False):
+    def __init__(self, root, systems=[2, 3, 4, 5, 6, 7, 8, 9], cutoff_dist=None, edge_features='all', transform_rotate=None, transform_mirror=None, use_static_features=False):
         self.root = root
         self.systems = systems
         self.use_static_features = use_static_features
         self.cutoff_dist = cutoff_dist
         self.edge_features = edge_features
         self.transform_rotate = transform_rotate
-
+        self.transform_mirror = transform_mirror
+        
         self.cache = {}
         self.index_map = []
 
@@ -198,9 +199,20 @@ class FeGdMagneticDataset(Dataset):
         moment = torch.tensor(m_t[['M_x','M_y','M_z']].values, dtype=torch.float) #spin moments as node features
         y = torch.tensor(B_t[['B_x','B_y','B_z']].values, dtype=torch.float) #magnetic field as target
         
+        # edges
+        if self.cutoff_dist: # apply cutoff
+            nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
+
+        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
+
         # Apply augmentation if specified
+        rel_pos = edge_attr[:, :3] #placeholder for relative position vector
         if self.transform_rotate is not None:
-            moment, y, pos = self.transform_rotate(moment, y, pos)
+            moment, y, pos, rel_pos = self.transform_rotate(moment, y, pos, rel_pos)
+        if self.transform_mirror is not None:
+            moment, y, pos, rel_pos = self.transform_mirror(moment, y, pos, rel_pos)
+        edge_attr[:, :3] = rel_pos #redefine transformed relative position vector
+
 
         # Set up the node features
         x_parts = [
@@ -213,12 +225,6 @@ class FeGdMagneticDataset(Dataset):
 
         x = torch.cat(x_parts, dim=1)
 
-        # edges
-        if self.cutoff_dist: # apply cutoff
-            nbr_df = nbr_df[nbr_df['rij'] <= self.cutoff_dist]
-
-        edge_index, edge_attr = build_edges_from_neighbors(nbr_df, self.edge_features)
-        
         return Data(
             x=x,
             edge_index=edge_index,
@@ -230,16 +236,33 @@ class FeGdMagneticDataset(Dataset):
         )
 
 if __name__ == "__main__":
+    import sys
+    from pathlib import Path
     from time import time
+    
+    # Add the parent directory to sys.path to allow imports
+    sys.path.insert(0, str(Path(__file__).parent))
+    
+    from augmentation import RandomRotationTransform, MirrorTransformation
+    
     start = time()
+    cut_off = 0.25
+    # Get data path relative to this script's directory
+    data_path = Path(__file__).parent.parent / 'data'
     
-    data_path = f'/python/deep_learning/p30gnn/data'
-    train_dataset = FeGdMagneticDataset(data_path, systems=[2, 3, 4, 5], cutoff_dist=0.51)
-    val_dataset = FeGdMagneticDataset(data_path, systems=[6, 7], cutoff_dist=0.51)
-    test_dataset = FeGdMagneticDataset(data_path, systems=[8, 9], cutoff_dist=0.51)
-    
-    print(f"Dataset loaded in {time() - start:.2f} seconds")
-
-    # create the train, val and test_dataset and store them in the same directory as data_path
+    try:
+        train_dataset = FeGdMagneticDataset(str(data_path), systems=[2, 3, 4, 5], cutoff_dist=cut_off, transform_rotate=RandomRotationTransform, transform_mirror=MirrorTransformation)
+        val_dataset = FeGdMagneticDataset(str(data_path), systems=[6, 7], cutoff_dist=cut_off)
+        test_dataset = FeGdMagneticDataset(str(data_path), systems=[8, 9], cutoff_dist=cut_off)
+        
+        print(f"Dataset loaded in {time() - start:.2f} seconds")
+        print(f"Train samples: {len(train_dataset)}")
+        print(f"Val samples: {len(val_dataset)}")
+        print(f"Test samples: {len(test_dataset)}")
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
     
     
