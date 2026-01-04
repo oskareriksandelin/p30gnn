@@ -345,7 +345,7 @@ class Statistics:
         print("=" * 60)
 
 ###################### Evaluation Utilities ######################
-def evaluate_physical_metrics(model, loader, device, f, y_std):
+def evaluate_physical_metrics(model, loader, device, y_mean, y_std):
     """Evaluate on original (denormalized) scale"""
     model.eval()
     all_preds = []
