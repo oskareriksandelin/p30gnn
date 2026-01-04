@@ -63,10 +63,11 @@ from tqdm import tqdm
 
 
 class BFieldTrainer:
-    def __init__(self, model, device, optimizer, lambda_angle=0.0, eps=1e-8):
+    def __init__(self, model, device, optimizer, lambda_angle=0.0, eps=1e-8, scheduler=None):
         self.model = model.to(device)
         self.device = device
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.lambda_angle = lambda_angle
         self.eps = eps
         self.criterion = nn.MSELoss()
@@ -77,6 +78,7 @@ class BFieldTrainer:
             "val_mae": [],
             "val_mse": [],
             "val_angle": [],
+            "lr": [],
         }
 
     def train_one_epoch(self, loader):
@@ -146,13 +148,19 @@ class BFieldTrainer:
             train_loss = self.train_one_epoch(train_loader)
             val_loss, mag_mae, val_mse, val_ang = self.evaluate(val_loader)
 
+            if self.scheduler is not None:
+                self.scheduler.step(val_loss)
+            self.history["lr"].append(self.optimizer.param_groups[0]['lr'])
+
+
             print(
                 f"Epoch {epoch:3d}/{epochs} | "
-                f"Train {train_loss:.6f} | "
-                f"Val {val_loss:.6f} | "
+                f"Train loss {train_loss:.6f} | "
+                f"Val loss {val_loss:.6f} | "
                 f"MSE {val_mse:.6f} | "
-                f"Angle {val_ang:.2f}°"
-                f"Magmae {mag_mae:.6f} | "
+                f"Angle {val_ang:.2f}° | "
+                f"|B| MAE {mag_mae:.6f} | "
+                f"lr {self.optimizer.param_groups[0]['lr']:.6f}"
             )
         return self.history
 
