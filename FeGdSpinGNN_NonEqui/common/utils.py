@@ -246,8 +246,12 @@ def plot_spin_B_histograms(dataset, systems=None, bins=30):
         fig_b.tight_layout()
         plt.show()
 
-def plot_correlation(model, loader, device, y_mean, y_std):
-    """Plot predicted vs true B-field values"""
+import torch
+import matplotlib.pyplot as plt
+
+
+def plot_correlation(model, loader, device, normalizer):
+    """Plot predicted vs true B-field values (denormalized via normalizer)."""
     model.eval()
     all_preds = []
     all_targets = []
@@ -255,10 +259,11 @@ def plot_correlation(model, loader, device, y_mean, y_std):
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
-            out = model(batch)
+            out = model(batch)  # [N, 3]
 
-            out_denorm = (out * y_std.to(device) + y_mean.to(device)).cpu()
-            y_denorm = (batch.y * y_std.to(device) + y_mean.to(device)).cpu()
+            # denormalize
+            out_denorm = normalizer.unnormalize_target(out.detach().cpu())
+            y_denorm = normalizer.unnormalize_target(batch.y.detach().cpu())
 
             all_preds.append(out_denorm)
             all_targets.append(y_denorm)
@@ -267,7 +272,7 @@ def plot_correlation(model, loader, device, y_mean, y_std):
     all_targets = torch.cat(all_targets, dim=0).numpy()
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    components = ['Bx', 'By', 'Bz']
+    components = ["Bx", "By", "Bz"]
 
     for i, comp in enumerate(components):
         axes[i].scatter(all_targets[:, i], all_preds[:, i], alpha=0.3, s=1)
@@ -275,15 +280,116 @@ def plot_correlation(model, loader, device, y_mean, y_std):
         # Perfect prediction line
         min_val = min(all_targets[:, i].min(), all_preds[:, i].min())
         max_val = max(all_targets[:, i].max(), all_preds[:, i].max())
-        axes[i].plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect')
+        axes[i].plot([min_val, max_val], [min_val, max_val], "k--")
 
-        axes[i].set_xlabel(f'True')
-        axes[i].set_ylabel(f'Predicted')
-        axes[i].set_title(f'{comp}')
-        #axes[i].legend()
+        axes[i].set_xlabel("True")
+        axes[i].set_ylabel("Predicted")
+        axes[i].set_title(comp)
         axes[i].grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
+
+
+def plot_true_pred_B_fields(model, dataset, sample_indices, normalizer,
+                            scale_B=50000, figsize=(7, 7), device='cpu'):
+    """
+    Plot true and predicted B-fields for each sample in separate figures
+    """
+    model.eval()
+
+    with torch.no_grad():
+        for sample_idx in sample_indices:
+            data = dataset[sample_idx].to(device)
+            pred = model(data)
+
+            # denormalize B-fields
+            pred_denorm = normalizer.unnormalize_target(pred.cpu())
+            true_denorm = normalizer.unnormalize_target(data.y.cpu())
+
+            pos = data.pos.cpu().numpy()
+
+            plt.figure(figsize=figsize)
+            # true
+            plt.quiver(pos[:, 0][::3], pos[:, 2][::3], true_denorm[:, 0][::3], true_denorm[:, 2][::3],
+                      color='red', scale=scale_B, label='B-field (True)',
+                      alpha=0.7, width=0.004)
+
+            # predicted
+            plt.quiver(pos[:, 0][::3], pos[:, 2][::3], pred_denorm[:, 0][::3], pred_denorm[:, 2][::3],
+                      color='blue', scale=scale_B, label='B-field (Pred)',
+                      alpha=0.6, width=0.003)
+
+            plt.xlabel('x')
+            plt.ylabel('z')
+            plt.title(f'Sample {sample_idx}: True vs Predicted B-field')
+            plt.legend()
+            plt.grid(True, alpha=0.8)
+            plt.axis('equal')
+            plt.tight_layout()
+            plt.show()
+
+def training_plot(num_epochs, train_losses, val_losses):
+    plt.plot(range(1, num_epochs + 1), train_losses, label='Train Loss')
+    plt.plot(range(1, num_epochs + 1), val_losses, label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.show()
+
+def evaluate_physical_metrics(model, loader, device, target_normalizer):
+    """
+
+    Args:
+        model: trained model
+        loader: PyG DataLoader
+        device: torch device
+        target_normalizer: fitted TargetNormalizer instance
+
+    Returns:
+        dict with MSE, RMSE, MAE (total and per-component)
+    """
+
+    model.eval()
+    all_preds = []
+    all_targets = []
+
+    with torch.no_grad():
+        for batch in loader:
+            batch = batch.to(device)
+
+            # Model outputs are normalized vectors
+            out_norm = model(batch)
+
+            # Denormalize using scalar magnitude std
+            out = target_normalizer.unnormalize_target(out_norm)
+            y = target_normalizer.unnormalize_target(batch.y)
+
+            all_preds.append(out.cpu())
+            all_targets.append(y.cpu())
+
+    all_preds = torch.cat(all_preds, dim=0)     # [N_total, 3]
+    all_targets = torch.cat(all_targets, dim=0) # [N_total, 3]
+
+    diff = all_preds - all_targets
+
+    # Global metrics
+    mse = torch.mean(diff ** 2)
+    rmse = torch.sqrt(mse)
+    mae = torch.mean(torch.abs(diff))
+
+    # Per-component MSE
+    mse_per_comp = torch.mean(diff ** 2, dim=0)
+
+    return {
+        'mse': mse.item(),
+        'rmse': rmse.item(),
+        'mae': mae.item(),
+        'mse_x': mse_per_comp[0].item(),
+        'mse_y': mse_per_comp[1].item(),
+        'mse_z': mse_per_comp[2].item(),
+    }
+
+
 
 
