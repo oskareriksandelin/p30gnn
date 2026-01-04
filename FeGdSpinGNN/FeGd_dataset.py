@@ -132,10 +132,13 @@ class FeGdMagneticDataset(Dataset):
         for sys in tqdm(self.systems, desc="Loading systems"):
             path = os.path.join(self.root, f'FeGd_data_POSCAR_{sys}')
             #path_b_data = os.path.join(self.root, f'fields/POSCAR_{sys}')
+            #path_b_data = os.path.join(self.root, f'fields/POSCAR_{sys}')
 
             pos = pd.read_csv(f'{path}/coord.FeGd_100.out', sep=r'\s+', header=None,
                               names=['id','x','y','z','i1','i2'])[['x','y','z']]
 
+            B = pd.read_csv(f'{path}/bintefftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
+                            names=['Iter','Site','Replica','B_x','B_y','B_z', 'B', 'sld_x', 'sld_y', 'sld_z', 'sld'])
             B = pd.read_csv(f'{path}/bintefftot.FeGd_100.out', sep=r'\s+', header=None, comment='#',
                             names=['Iter','Site','Replica','B_x','B_y','B_z', 'B', 'sld_x', 'sld_y', 'sld_z', 'sld'])
 
@@ -153,6 +156,7 @@ class FeGdMagneticDataset(Dataset):
             # cache data so we don't reload every time
             self.cache[sys] = dict(pos=pos, B=B, m=m, nbr=nbr, static=static)
 
+
             # build index map for (system, timestep)
             iter_vals = sorted(B['Iter'].unique())  # use real Iter values from the file
             for t in iter_vals:
@@ -164,7 +168,7 @@ class FeGdMagneticDataset(Dataset):
         # Note: sorted in reverse order to match atom indexing with Gd first.
         files = sorted([f for f in os.listdir(nml_dir) if f.startswith(('Fe', 'Gd'))], reverse=True)
         return {i+1: parse_nml(os.path.join(nml_dir, f)) for i, f in enumerate(files)}
-
+    
     def __len__(self):
         return len(self.index_map)
 
@@ -185,6 +189,8 @@ class FeGdMagneticDataset(Dataset):
         node_type = torch.zeros((n_atoms, 2), dtype=torch.float)
         fe = torch.tensor([1.0, 0.0])
         gd = torch.tensor([0.0, 1.0])
+
+        # Each cell has 24 Gd and 76 Fe atoms, each cell repeated 8 times but time evolved independently
 
         # Each cell has 24 Gd and 76 Fe atoms, each cell repeated 8 times but time evolved independently
         for i in range(8):
