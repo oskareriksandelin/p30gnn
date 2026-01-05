@@ -63,13 +63,14 @@ from tqdm import tqdm
 
 
 class BFieldTrainer:
-    def __init__(self, model, device, optimizer, lambda_angle=0.0, eps=1e-8, scheduler=None):
+    def __init__(self, model, device, optimizer, lambda_angle=0.0, eps=1e-8, mag_threshold=1e-3, scheduler=None):
         self.model = model.to(device)
         self.device = device
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.lambda_angle = lambda_angle
         self.eps = eps
+        self.mag_threshold = mag_threshold
         self.criterion = nn.MSELoss()
 
         self.history = {
@@ -94,7 +95,7 @@ class BFieldTrainer:
             target = batch.y
 
             mse = self.criterion(pred, target)
-            angle = cosine_angle_loss(pred, target, eps=self.eps)
+            angle = cosine_angle_loss(pred, target, mag_threshold=self.mag_threshold, eps=self.eps)
 
             loss = mse + self.lambda_angle * angle
             loss.backward()
@@ -120,7 +121,7 @@ class BFieldTrainer:
             target = batch.y
 
             mse = self.criterion(pred, target)
-            angle = cosine_angle_loss(pred, target, eps=self.eps)
+            angle = cosine_angle_loss(pred, target, mag_threshold=self.mag_threshold, eps=self.eps)
             loss = mse + self.lambda_angle * angle
 
             total_loss += loss.item()
@@ -134,7 +135,7 @@ class BFieldTrainer:
 
         B_pred = torch.cat(preds)
         B_true = torch.cat(targets)
-        mag_mae, ang_deg = magnitude_and_angle_error(B_pred, B_true, eps=self.eps)
+        mag_mae, ang_deg = magnitude_and_angle_error(B_pred, B_true, mag_threshold=self.mag_threshold, eps=self.eps)
 
         self.history["val_loss"].append(avg_loss)
         self.history["val_mse"].append(avg_mse)
