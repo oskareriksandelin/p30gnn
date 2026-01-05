@@ -365,8 +365,8 @@ def evaluate_physical_metrics(model, loader, device, target_normalizer):
             out = target_normalizer.unnormalize_target(out_norm)
             y = target_normalizer.unnormalize_target(batch.y)
 
-            all_preds.append(out.cpu())
-            all_targets.append(y.cpu())
+            all_preds.append(out)
+            all_targets.append(y)
 
     all_preds = torch.cat(all_preds, dim=0)     # [N_total, 3]
     all_targets = torch.cat(all_targets, dim=0) # [N_total, 3]
