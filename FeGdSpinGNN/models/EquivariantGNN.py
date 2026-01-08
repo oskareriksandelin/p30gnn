@@ -14,14 +14,14 @@ class EquivariantGNN(nn.Module):
 
     def __init__(
         self,
-        hidden_irreps="32x0e + 16x1o + 8x2e",
+        hidden_irreps="64x0e + 32x1o + 16x2e",
         lmax=2,
-        num_layers=3,
+        num_layers=4,
         max_radius=0.35,
-        num_radial_basis=8,
+        num_radial_basis=6,
         rmlp_dropout=0.0,
         conv_dropout=0.0,
-        n_sphere_samples=128,
+        n_sphere_samples=256,
     ):
         super().__init__()
 
@@ -123,8 +123,8 @@ class TPConvLayer(MessagePassing):
         out_irreps,
         edge_sh_irreps,  # spherical harmonics
         hidden_irreps,
-        num_radial_basis=8,
-        max_radius=10.0,
+        num_radial_basis=6,
+        max_radius=0.35,
         rmlp_dropout=0.0,  # dropout for radial MLP
         conv_dropout=0.0   # dropout for convolution
     ):
@@ -244,7 +244,7 @@ class RadialBasisEmbedding(nn.Module):
         cutoff: maximum distance
         learnable: whether basis centers and widths are learnable
     """
-    def __init__(self, num_basis=8, cutoff=10.0, learnable=False):
+    def __init__(self, num_basis=6, cutoff=0.35, learnable=False):
         super().__init__()
         self.num_basis = num_basis
         self.cutoff = cutoff
