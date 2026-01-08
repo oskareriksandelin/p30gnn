@@ -382,3 +382,42 @@ def evaluate_physical_metrics(model, loader, device, y_mean, y_std):
         'mse_y': mse_per_comp[1].item(),
         'mse_z': mse_per_comp[2].item()
     }
+
+###################### Evaluation Utilities ######################
+def evaluate_physical_metrics(model, loader, device, y_mean, y_std):
+    """Evaluate on original (denormalized) scale"""
+    model.eval()
+    all_preds = []
+    all_targets = []
+    
+    with torch.no_grad():
+        for batch in loader:
+            batch = batch.to(device)
+            out = model(batch)
+            
+            # Denormalize predictions and targets
+            out_denorm = out * y_std.to(device) + y_mean.to(device)
+            y_denorm = batch.y * y_std.to(device) + y_mean.to(device)
+            
+            all_preds.append(out_denorm.cpu())
+            all_targets.append(y_denorm.cpu())
+    
+    all_preds = torch.cat(all_preds, dim=0)
+    all_targets = torch.cat(all_targets, dim=0)
+    
+    # Compute metrics
+    mse = torch.mean((all_preds - all_targets)**2)
+    rmse = torch.sqrt(mse)
+    mae = torch.mean(torch.abs(all_preds - all_targets))
+    
+    # Per-component metrics
+    mse_per_comp = torch.mean((all_preds - all_targets)**2, dim=0)
+    
+    return {
+        'mse': mse.item(),
+        'rmse': rmse.item(),
+        'mae': mae.item(),
+        'mse_x': mse_per_comp[0].item(),
+        'mse_y': mse_per_comp[1].item(),
+        'mse_z': mse_per_comp[2].item()
+    }
